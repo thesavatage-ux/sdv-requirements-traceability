@@ -1384,12 +1384,10 @@ html_code = f"""<!DOCTYPE html>
 
       arxmlModalTitle.textContent = `AUTOSAR ARXML: ${{swc.name}} (${{swc.type}})`;
 
-      const portsXml = [
-        ...swc.ports_required.map(p => `          <R-PORT-PROTOTYPE>\n            <SHORT-NAME>${{p.name}}</SHORT-NAME>\n            <REQUIRED-INTERFACE-TREF DEST="SENDER-RECEIVER-INTERFACE">/Interfaces/${{p.signal}}_IF</REQUIRED-INTERFACE-TREF>\n          </R-PORT-PROTOTYPE>`),
-        ...swc.ports_provided.map(p => `          <P-PORT-PROTOTYPE>\n            <SHORT-NAME>${{p.name}}</SHORT-NAME>\n            <PROVIDED-INTERFACE-TREF DEST="SENDER-RECEIVER-INTERFACE">/Interfaces/${{p.signal}}_IF</PROVIDED-INTERFACE-TREF>\n          </P-PORT-PROTOTYPE>`)
-      ].join("\n");
+      const reqPortsStr = swc.ports_required.map(p => `          <R-PORT-PROTOTYPE>\n            <SHORT-NAME>${{p.name}}</SHORT-NAME>\n            <REQUIRED-INTERFACE-TREF DEST="SENDER-RECEIVER-INTERFACE">/Interfaces/${{p.signal}}_IF</REQUIRED-INTERFACE-TREF>\n          </R-PORT-PROTOTYPE>`).join(String.fromCharCode(10));
+      const provPortsStr = swc.ports_provided.map(p => `          <P-PORT-PROTOTYPE>\n            <SHORT-NAME>${{p.name}}</SHORT-NAME>\n            <PROVIDED-INTERFACE-TREF DEST="SENDER-RECEIVER-INTERFACE">/Interfaces/${{p.signal}}_IF</PROVIDED-INTERFACE-TREF>\n          </P-PORT-PROTOTYPE>`).join(String.fromCharCode(10));
 
-      const runnablesXml = swc.runnables.map(r => `          <RUNNABLE-ENTITY>\n            <SHORT-NAME>${{r.name}}</SHORT-NAME>\n            <CAN-BE-INVOKED-CONCURRENTLY>false</CAN-BE-INVOKED-CONCURRENTLY>\n            <SYMBOL>${{r.name}}_func</SYMBOL>\n          </RUNNABLE-ENTITY>`).join("\n");
+      const runnablesStr = swc.runnables.map(r => `          <RUNNABLE-ENTITY>\n            <SHORT-NAME>${{r.name}}</SHORT-NAME>\n            <CAN-BE-INVOKED-CONCURRENTLY>false</CAN-BE-INVOKED-CONCURRENTLY>\n            <SYMBOL>${{r.name}}_func</SYMBOL>\n          </RUNNABLE-ENTITY>`).join(String.fromCharCode(10));
 
       const arxml = `<?xml version="1.0" encoding="UTF-8"?>
 <AUTOSAR xmlns="http://autosar.org/schema/r4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://autosar.org/schema/r4.0 AUTOSAR_4-4-0.xsd">
@@ -1401,13 +1399,14 @@ html_code = f"""<!DOCTYPE html>
           <SHORT-NAME>${{swc.name}}</SHORT-NAME>
           <CATEGORY>${{swc.type}}</CATEGORY>
           <PORTS>
-${{portsXml}}
+${{reqPortsStr}}
+${{provPortsStr}}
           </PORTS>
           <INTERNAL-BEHAVIORS>
             <SWC-INTERNAL-BEHAVIOR>
               <SHORT-NAME>${{swc.name}}_InternalBehavior</SHORT-NAME>
               <RUNNABLES>
-${{runnablesXml}}
+${{runnablesStr}}
               </RUNNABLES>
             </SWC-INTERNAL-BEHAVIOR>
           </INTERNAL-BEHAVIORS>
@@ -1485,11 +1484,11 @@ ${{runnablesXml}}
 
     btnExportCsv.addEventListener("click", () => {{
       const filtered = getFilteredSWCs();
-      let csv = "Component Name,Type,Domain,Feature ID,ASIL,Multi-Core Target,MPU Partition,WCET ms,Required Ports,Provided Ports\\n";
+      let csvLines = ["Component Name,Type,Domain,Feature ID,ASIL,Multi-Core Target,MPU Partition,WCET ms,Required Ports,Provided Ports"];
       filtered.forEach(s => {{
-        csv += `"${{s.name}}","${{s.type}}","${{s.domain}}","${{s.feature_id}}","${{s.asil}}","${{s.core}}","${{s.mpu_partition}}","${{s.total_wcet_ms}}","${{s.ports_required.length}}","${{s.ports_provided.length}}"\\n`;
+        csvLines.push(`"${{s.name}}","${{s.type}}","${{s.domain}}","${{s.feature_id}}","${{s.asil}}","${{s.core}}","${{s.mpu_partition}}","${{s.total_wcet_ms}}","${{s.ports_required.length}}","${{s.ports_provided.length}}"`);
       }});
-      const blob = new Blob([csv], {{ type: "text/csv;charset=utf-8;" }});
+      const blob = new Blob([csvLines.join(String.fromCharCode(10))], {{ type: "text/csv;charset=utf-8;" }});
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
