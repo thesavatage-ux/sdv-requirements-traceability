@@ -89,6 +89,21 @@ for f in all_features:
                 "safety_mechanism": sw.get("safety_mechanism", "Plausibility monitoring.")
             })
             
+    def clean_signal_label(raw: str) -> str:
+        if not raw:
+            return "RTE Bus"
+        # Remove array indexing like [16] or [0..3]
+        s = re.sub(r'\[.*?\]', '', raw)
+        # Remove characters that violate Mermaid edge/node grammar
+        s = re.sub(r'[\[\]{}()|"<>\'`:,;*&%#\\]', '', s)
+        s = s.strip()
+        if not s:
+            return "RTE Bus"
+        tokens = s.split()
+        chosen = tokens[0] if tokens else "RTE Bus"
+        chosen = chosen[:22].rstrip('_')
+        return chosen if chosen else "RTE Bus"
+
     mermaid_lines = [
         "graph LR",
         "    classDef sensor fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff;",
@@ -102,13 +117,16 @@ for f in all_features:
     first_swc = feature_swcs[0] if feature_swcs else None
     last_swc = feature_swcs[-1] if feature_swcs else None
     
-    mermaid_lines.append('    InboundSensors["Physical Sensors / Bus In<br>(SENT / ADC / CAN-FD)"]:::ext')
-    mermaid_lines.append('    OutboundActuators["Physical Actuators / Output Stage<br>(H-Bridge / PWM / Inverter)"]:::ext')
-    mermaid_lines.append('    DEM["AUTOSAR DEM / DTC Logger<br>(Diagnostic Event Manager)"]:::bsw')
+    mermaid_lines.append('    InboundSensors["Physical Sensors / Bus In<br/>SENT / ADC / CAN-FD"]:::ext')
+    mermaid_lines.append('    OutboundActuators["Physical Actuators / Output Stage<br/>H-Bridge / PWM / Inverter"]:::ext')
+    mermaid_lines.append('    DEM["AUTOSAR DEM / DTC Logger<br/>Diagnostic Event Manager"]:::bsw')
     
     for idx, s in enumerate(feature_swcs):
         node_id = f"SWC_{idx}"
-        label = f"<b>{s['name']}</b><br><small>{s['period']} | {s['asil']}</small>"
+        clean_name = re.sub(r'[\[\]{}()|"<>\'`]', '', s['name'])
+        clean_period = re.sub(r'[\[\]{}()|"<>\'`]', '', s['period'])
+        clean_asil = re.sub(r'[\[\]{}()|"<>\'`]', '', s['asil'])
+        label = f"<b>{clean_name}</b><br/><small>{clean_period} - {clean_asil}</small>"
         cls_name = "app"
         if s["type"] == "SensorActuatorSWC": cls_name = "sensor"
         elif s["type"] == "ServiceSupervisorSWC": cls_name = "supervisor"
@@ -125,9 +143,9 @@ for f in all_features:
             
             sig_label = "RTE S/R Bus"
             if s_curr["out_signals"]:
-                sig_label = s_curr["out_signals"][0].split()[0][:20]
+                sig_label = clean_signal_label(s_curr["out_signals"][0])
             elif s_next["in_signals"]:
-                sig_label = s_next["in_signals"][0].split()[0][:20]
+                sig_label = clean_signal_label(s_next["in_signals"][0])
                 
             mermaid_lines.append(f'    SWC_{idx} -->|{sig_label}| SWC_{idx+1}')
             
@@ -159,36 +177,40 @@ global_mermaid = """graph TD
     classDef bsw fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#fff;
     classDef hw fill:#18181b,stroke:#71717a,stroke-width:1px,stroke-dasharray: 4 4,color:#e4e4e7;
 
-    Sensors["Physical Sensors & Input Feeds<br>• Camera, Radar, LiDAR, Ultrasonic<br>• Wheel Speed, Steering Angle, IMU<br>• Battery Cell Voltages, Brake Pressure"]:::hw
+    Sensors["Physical Sensors & Input Feeds<br/>Camera, Radar, LiDAR, Ultrasonic<br/>Wheel Speed, Steering Angle, IMU<br/>Battery Cell Voltages, Brake Pressure"]:::hw
 
     subgraph VFB["Virtual Functional Bus (VFB) / Runtime Environment (RTE) Backbone"]
         direction TB
-        DOM_ADAS["Domain 1: ADAS & Autonomous Driving<br>• AccTargetFusion, AebCrashPlanner, LcaCentering<br>• Core 3 (400 MHz) | ASIL B"]:::domain
-        DOM_CHS["Domain 2: Vehicle Motion & Chassis Control<br>• SbW Handwheel/Rack, BbW Decel, ESC Dynamics<br>• Core 1 Lockstep (300 MHz) | ASIL D"]:::domain
-        DOM_PWR["Domain 3: Electric Powertrain & Energy<br>• Dual Inverter FOC, BMS Isolation, Torque Vectoring<br>• Core 2 Lockstep (300 MHz) | ASIL C/D"]:::domain
-        DOM_BDY["Domain 4: Body, Lighting & Restraints<br>• PEPS UWB, Matrix LED, Airbag SRS, Heat Pump<br>• Core 0 (300 MHz) | ASIL B/D"]:::domain
-        DOM_CPT["Domain 5: Digital Cockpit & Cabin Sensing<br>• Driver Monitoring (DMS), AR-HUD, AVAS Sound<br>• HPC Cortex-A78 Cluster | QM/ASIL B"]:::domain
-        DOM_CONN["Domain 6: Connectivity, Security & Diagnostics<br>• 5G Telematics, SecOC Crypto, FOTA, UDS DEM<br>• Core 0 Gateway & HSM | ASIL B/QM"]:::domain
+        DOM_ADAS["Domain 1: ADAS & Autonomous Driving<br/>AccTargetFusion, AebCrashPlanner, LcaCentering<br/>Core 3 (400 MHz) - ASIL B"]:::domain
+        DOM_CHS["Domain 2: Vehicle Motion & Chassis Control<br/>SbW Handwheel/Rack, BbW Decel, ESC Dynamics<br/>Core 1 Lockstep (300 MHz) - ASIL D"]:::domain
+        DOM_PWR["Domain 3: Electric Powertrain & Energy<br/>Dual Inverter FOC, BMS Isolation, Torque Vectoring<br/>Core 2 Lockstep (300 MHz) - ASIL C/D"]:::domain
+        DOM_BDY["Domain 4: Body, Lighting & Restraints<br/>PEPS UWB, Matrix LED, Airbag SRS, Heat Pump<br/>Core 0 (300 MHz) - ASIL B/D"]:::domain
+        DOM_CPT["Domain 5: Digital Cockpit & Cabin Sensing<br/>Driver Monitoring (DMS), AR-HUD, AVAS Sound<br/>HPC Cortex-A78 Cluster - QM/ASIL B"]:::domain
+        DOM_CONN["Domain 6: Connectivity, Security & Diagnostics<br/>5G Telematics, SecOC Crypto, FOTA, UDS DEM<br/>Core 0 Gateway & HSM - ASIL B/QM"]:::domain
     end
 
     subgraph BSW_STACK["AUTOSAR Basic Software (BSW) & Safety Core"]
         direction LR
-        OS["Multi-Core OS<br>(OSEK/VDX Tasks)"]:::bsw
-        DEM["Diagnostic Event Mgr<br>(DEM / DTC Storage)"]:::bsw
-        WDGM["Watchdog Mgr<br>(WdgM / Alive/Deadline)"]:::bsw
-        SECOC["Secure Onboard Com<br>(SecOC / AES-128 MAC)"]:::bsw
-        MCAL["MCAL Drivers<br>(ADC, PWM, CAN, ETH)"]:::bsw
+        OS["Multi-Core OS<br/>(OSEK/VDX Tasks)"]:::bsw
+        DEM["Diagnostic Event Mgr<br/>(DEM / DTC Storage)"]:::bsw
+        WDGM["Watchdog Mgr<br/>(WdgM / Alive/Deadline)"]:::bsw
+        SECOC["Secure Onboard Com<br/>(SecOC / AES-128 MAC)"]:::bsw
+        MCAL["MCAL Drivers<br/>(ADC, PWM, CAN, ETH)"]:::bsw
     end
 
-    Actuators["Vehicle Actuators & Hardware Power Stages<br>• Dual Permanent Magnet Traction Inverters<br>• Steer-by-Wire Dual Rack Motors<br>• Brake-by-Wire Electro-Hydraulic Plungers<br>• Matrix LED Headlamp Drivers & Squibs"]:::hw
+    Actuators["Vehicle Actuators & Hardware Power Stages<br/>Dual Permanent Magnet Traction Inverters<br/>Steer-by-Wire Dual Rack Motors<br/>Brake-by-Wire Electro-Hydraulic Plungers<br/>Matrix LED Headlamp Drivers & Squibs"]:::hw
 
-    Sensors ==>|Raw SENT/ADC/CAN-FD| VFB
-    DOM_ADAS <==>|Trajectory & Target Accel| DOM_CHS
-    DOM_CHS <==>|Torque & Regenerative Split| DOM_PWR
-    DOM_PWR <==>|Power Limits & HV Interlocks| DOM_BDY
-    DOM_CONN <==>|SecOC Protected Bus Frames| DOM_ADAS
-    VFB ==>|Actuation Duty Cycles & Setpoints| Actuators
-    VFB <==>|RTE Service Ports| BSW_STACK
+    Sensors -->|Raw SENT/ADC/CAN-FD| DOM_ADAS
+    Sensors -->|Chassis Dynamics Sensors| DOM_CHS
+    Sensors -->|Battery & Phase Telemetry| DOM_PWR
+    DOM_ADAS <-->|Trajectory & Target Accel| DOM_CHS
+    DOM_CHS <-->|Torque & Regenerative Split| DOM_PWR
+    DOM_PWR <-->|Power Limits & HV Interlocks| DOM_BDY
+    DOM_CONN <-->|SecOC Protected Bus Frames| DOM_ADAS
+    DOM_CHS -->|Steering & Braking Setpoints| Actuators
+    DOM_PWR -->|Inverter Phase Current Vectors| Actuators
+    DOM_BDY -->|Solid-State Relay Drives| Actuators
+    VFB <-->|RTE Service Ports| BSW_STACK
 """
 
 features_json_str = json.dumps(features_data, ensure_ascii=False)
@@ -724,14 +746,24 @@ html_template = """<!DOCTYPE html>
         diagramCode = GLOBAL_MERMAID;
       }
 
-      renderArea.innerHTML = '<pre class="mermaid" id="' + uniqueId + '">' + diagramCode + '</pre>';
+      renderArea.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:2rem; text-align:center;">Rendering SWC Architecture Pipeline...</div>';
 
       if (window.mermaid) {
-        try {
-          mermaid.run({ nodes: [document.getElementById(uniqueId)] });
-        } catch(e) {
-          console.warn("Mermaid render notice:", e);
-        }
+        const renderId = "mermaid_svg_" + Math.random().toString(36).substring(2, 11);
+        mermaid.render(renderId, diagramCode).then(res => {
+          renderArea.innerHTML = res.svg;
+          if (res.bindFunctions) res.bindFunctions(renderArea);
+        }).catch(err => {
+          console.warn("Mermaid async render error, using fallback:", err);
+          renderArea.innerHTML = '<pre class="mermaid" id="' + uniqueId + '">' + diagramCode + '</pre>';
+          try {
+            mermaid.run({ nodes: [document.getElementById(uniqueId)] });
+          } catch(e) {
+            console.error("Mermaid fallback run error:", e);
+          }
+        });
+      } else {
+        renderArea.innerHTML = '<pre class="mermaid" id="' + uniqueId + '">' + diagramCode + '</pre>';
       }
     }
 
